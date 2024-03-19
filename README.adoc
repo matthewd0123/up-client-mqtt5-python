@@ -1,0 +1,94 @@
+= uProtocol Client MQTTv5 Python Library
+:toc:
+:toclevels: 4
+:sectnums:
+:source-highlighter: coderay
+
+== Overview
+
+The following is the uProtocol client library that implements uTransport, defined in https://github.com/eclipse-uprotocol/up-python[uProtocol Python Library] using MQTTv5.
+
+---
+
+== Getting Started
+
+---
+
+=== Installing the library
+
+Run the following in your command line to install up_client_mqtt5_python into your site-packages:
+
+----
+cd up-client-mqtt5-python
+pip install .
+----
+
+---
+
+=== Import Guide
+
+
+==== Importing MQTT5UTransport
+----
+from up_client_mqtt5_python.mqtt5_utransport import MQTT5UTransport
+----
+
+
+==== Creating an instance of MQTT5UTransport:
+----
+mqtt5_publisher = MQTT5UTransport("client_id", "host_name", port)
+----
+* client_id (String): Device Id of your created MQTT Client
+* host_name (String): IP Address of the MQTT Broker
+* port (Integer): Port Number of your MQTT Broker
+
+
+==== Setting SSL Parameters for MQTT5UTransport (optional)
+----
+mqtt5_publisher.create_tls_context("certificate_filename", "key_filename", "key_pass_phrase", ssl_method, verify_mode, check_hostname)
+----
+* certificate_filename (String): Path to certificate file
+* key_filename (String): Path to file containing private key
+* key_pass_phrase (String): Password
+* ssl_method (_SSLMethod): Selection of encryption protocol. Default version is `ssl.PROTOCOL_TLSv1_2`.
+* verify_mode (VerifyMode): Selection of certification requirements for Client. Default is `ssl.CERT_NONE`.
+* check_hostname (Boolean): Whether to match the peer cert's hostname. Default is `False`.
+
+
+==== Connecting to the MQTT Broker
+----
+mqtt5_publisher.connect()
+----
+
+---
+
+=== Using UTransport APIs
+
+==== register_listener()
+----
+mqtt5_subscriber.register_listener(topic, listener)
+----
+* topic (UUri): Topic that the client will register to. This UUri is mapped to an MQTT topic according to the https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l1/mqtt.adoc[up-spec for MQTT].
+* listener (UListener): The listener that will be triggered when a message is received on the registered topic.
+
+==== unregister_listener()
+----
+mqtt5_subscriber.unregister_listener(topic, listener)
+----
+* topic (UUri): Topic that the client will unregister from. This UUri is mapped to an MQTT topic according to https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l1/mqtt.adoc[up-spec for MQTT].
+* listener (UListener): The listener that will be unregistered from the topic.
+
+==== send()
+----
+mqtt5_publisher.send(umsg)
+----
+* umsg (UMessage): Message that the publisher will send to the MQTT Broker. The topic will be constructed according to the UAttributes in the message.
+
+=== Running MQTT Pub/Sub Examples
+
+To run the provided MQTT Pub/Sub Examples, you will need to run the "eclipse-mosquitto" MQTT Broker inside docker. First, you will need to have docker and docker-compose on your system. Once you have this, run the following commands:
+----
+cd examples/docker_mosquitto
+docker-compose up -d --build
+----
+Once done, you can run `mqtt5_pub.py` and `mqtt5_sub.py` in the `examples` folder to test publishing and subscribing using the MQTTv5 UTransport.

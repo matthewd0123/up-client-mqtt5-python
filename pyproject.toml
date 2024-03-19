@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "up-client-mqtt5-python"
+version = "0.0.0-dev"
+description = "MQTT5-specific uProtocol library for building and using UUri, UUID, UAttributes, UTransport, and more."
+authors = ["Matthew D'Alonzo <matthew.dalonzo@gm.com>"]
+license = "The Apache License, Version 2.0"
+readme = "README.adoc"
+repository = "https://github.com/eclipse-uprotocol/up-python"
+packages = [{ include = "up_client_mqtt5_python" },
+    { include = "tests" }
+
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+up-python = "0.1.1-dev0"
+paho-mqtt = "2.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
