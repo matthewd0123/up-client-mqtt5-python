@@ -42,6 +42,8 @@ from uprotocol.proto.upayload_pb2 import UPayload
 from uprotocol.proto.uattributes_pb2 import UAttributes, UPriority
 from uprotocol.transport.ulistener import UListener
 from uprotocol.uri.validator.urivalidator import UriValidator
+from uprotocol.uri.serializer.shorturiserializer import ShortUriSerializer
+from uprotocol.cloudevent.serialize.base64protobufserializer import Base64ProtobufSerializer
 
 logging.basicConfig(
     format='%(levelname)s| %(filename)s:%(lineno)s %(message)s')
@@ -119,18 +121,35 @@ class MQTT5UTransport(UTransport):
 
         attributes: UAttributes = UAttributes()
         for user_property in publish_properties.UserProperty:
-            if user_property[0] == "upriority":
-                attributes.priority = UPriority.Value(user_property[1])
-            elif user_property[0] == "type":
+            if user_property[0] == "1":
+                id_proto: UUID = UUID()
+                id_proto.ParseFromString(Base64ProtobufSerializer().serialize(user_property[1]))
+                attributes.id.CopyFrom(id_proto)
+            elif user_property[0] == "2":
                 attributes.type = UMessageType.Value(user_property[1])
-            elif user_property[0] == "reqId":
-                attributes.reqid = UUID(bytes=user_property[1])
+            elif user_property[0] == "3":
+                attributes.source.CopyFrom(
+                    ShortUriSerializer().deserialize(user_property[1]))
+            elif user_property[0] == "4":
+                attributes.sink.CopyFrom(
+                    ShortUriSerializer().deserialize(user_property[1]))
+            elif user_property[0] == "5":
+                attributes.priority = UPriority.Value(user_property[1])
+            elif user_property[0] == "6":
+                attributes.ttl = int(user_property[1])
+            elif user_property[0] == "7":
+                attributes.permission_level = int(user_property[1])
+            elif user_property[0] == "8":
+                attributes.commstatus = UCode.Value(user_property[1])
+            elif user_property[0] == "9":
+                reqid_proto: UUID = UUID()
+                reqid_proto.ParseFromString(Base64ProtobufSerializer().serialize(user_property[1]))
+                attributes.reqid.CopyFrom(reqid_proto)
+            elif user_property[0] == "10":
+                attributes.token = user_property[1]
+            elif user_property[0] == "11":
+                attributes.traceparent = user_property[1]
 
-            # TODO: Implement Sink UserProperty with the Short Form URI
-            # elif user_property[0] == "sink":
-            #     micro_uri_serializer = MicroUriSerializer()
-            #     attributes.sink.CopyFrom(
-            #           micro_uri_serializer.deserialize(user_property[1]))
         umsg.attributes.CopyFrom(attributes)
 
         message_type_handlers = {
@@ -211,16 +230,28 @@ class MQTT5UTransport(UTransport):
         publish_properties = mqtt.Properties(mqtt.PacketTypes.PUBLISH)
         publish_properties.UserProperty = []
         try:
-            publish_properties.UserProperty.append(
-                ("upriority", UPriority.Name(uattributes_proto.priority)))
+            if uattributes_proto.HasField("id"):
+                publish_properties.UserProperty.append(("1", Base64ProtobufSerializer().deserialize(uattributes_proto.id.SerializeToString())))
+            publish_properties.UserProperty.append(("2", UMessageType.Name(uattributes_proto.type)))
+            if uattributes_proto.HasField("source"):
+                publish_properties.UserProperty.append(("3", ShortUriSerializer().serialize(uattributes_proto.source)))
+            if uattributes_proto.HasField("sink"):
+                publish_properties.UserProperty.append(("4", ShortUriSerializer().serialize(uattributes_proto.sink)))
+            publish_properties.UserProperty.append(("5", UPriority.Name(uattributes_proto.priority)))
+            if uattributes_proto.HasField("ttl"):
+                publish_properties.UserProperty.append(("6", str(uattributes_proto.ttl)))
+            if uattributes_proto.HasField("permission_level"):
+                publish_properties.UserProperty.append(("7", str(uattributes_proto.permission_level)))
+            if uattributes_proto.HasField("commstatus"):
+                publish_properties.UserProperty.append(("8", UCode.Name(uattributes_proto.commstatus)))
+            if uattributes_proto.type == UMessageType.UMESSAGE_TYPE_RESPONSE:
+                publish_properties.UserProperty.append(("9", Base64ProtobufSerializer().deserialize(uattributes_proto.reqid.SerializeToString())))
+            if uattributes_proto.HasField("token"):
+                publish_properties.UserProperty.append(("10", uattributes_proto.token))
+            if uattributes_proto.HasField("traceparent"):
+                publish_properties.UserProperty.append(("11", uattributes_proto.traceparent))
         except ValueError:
             raise ValueError("Priority not supported.")
-        message_type: UMessageType = uattributes_proto.type
-        publish_properties.UserProperty.append(
-            ("type", UMessageType.Name(message_type)))
-        if message_type == UMessageType.UMESSAGE_TYPE_RESPONSE:
-            publish_properties.UserProperty.append(
-                ("reqId", uattributes_proto.reqid))
         # TODO: Implement Sink UserProperty with the Short Form URI
         # if uattributes_proto.HasField("sink"):
         #     micro_uri_serializer = MicroUriSerializer()
