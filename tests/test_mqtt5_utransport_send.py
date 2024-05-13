@@ -4,7 +4,7 @@ import socket
 import json
 
 from up_client_mqtt5_python.mqtt5_utransport import MQTT5UTransport
-from tests.testsupport.broker import FakeBroker, fake_broker  # noqa: F401
+from tests.testsupport.broker import fake_broker  # noqa: F401, F811
 
 from google.protobuf.timestamp_pb2 import Timestamp
 
@@ -121,7 +121,7 @@ class MQTT5UListener(UListener):
 
 class TestMQTT5UTransportSend:
 
-    def test_utransport_send_valid_format_protobuf(self, fake_broker):
+    def test_utransport_send_valid_format_protobuf(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",
@@ -133,7 +133,7 @@ class TestMQTT5UTransportSend:
         status = transport.send(umsg)
         assert status.code == UCode.OK
 
-    def test_utransport_send_valid_format_protobuf_any(self, fake_broker):
+    def test_utransport_send_valid_format_protobuf_any(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",
@@ -145,7 +145,7 @@ class TestMQTT5UTransportSend:
         status = transport.send(umsg)
         assert status.code == UCode.OK
 
-    def test_utransport_send_valid_format_json(self, fake_broker):
+    def test_utransport_send_valid_format_json(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",
@@ -157,7 +157,7 @@ class TestMQTT5UTransportSend:
         status = transport.send(umsg)
         assert status.code == UCode.OK
 
-    def test_utransport_send_no_authority(self, fake_broker):
+    def test_utransport_send_no_authority(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",
@@ -171,7 +171,7 @@ class TestMQTT5UTransportSend:
         status = transport.send(umsg)
         assert status.code == UCode.OK
 
-    def test_utransport_send_no_entity(self, fake_broker):
+    def test_utransport_send_no_entity(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",
@@ -189,7 +189,7 @@ class TestMQTT5UTransportSend:
         ):
             transport.send(umsg)
 
-    def test_utransport_send_no_resource(self, fake_broker):
+    def test_utransport_send_no_resource(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",
@@ -207,7 +207,7 @@ class TestMQTT5UTransportSend:
         ):
             transport.send(umsg)
 
-    def test_utransport_register_listener_valid(self, fake_broker):
+    def test_utransport_register_listener_valid(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",
@@ -219,7 +219,7 @@ class TestMQTT5UTransportSend:
         status = transport.register_listener(topic, MQTT5UListener())
         assert status.code == UCode.OK
 
-    def test_utransport_register_listener_no_authority(self, fake_broker):
+    def test_utransport_register_listener_no_authority(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",
@@ -231,7 +231,7 @@ class TestMQTT5UTransportSend:
         status = transport.register_listener(topic, MQTT5UListener())
         assert status.code == UCode.OK
 
-    def test_utransport_register_listener_no_entity(self, fake_broker):
+    def test_utransport_register_listener_no_entity(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",
@@ -247,7 +247,7 @@ class TestMQTT5UTransportSend:
         ):
             transport.register_listener(topic, MQTT5UListener())
 
-    def test_utransport_register_listener_no_resource(self, fake_broker):
+    def test_utransport_register_listener_no_resource(self, fake_broker):  # noqa: F811
         transport = MQTT5UTransport(
             client_id="test_client",
             host_name="localhost",

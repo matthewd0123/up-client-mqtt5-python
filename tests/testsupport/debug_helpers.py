@@ -38,7 +38,7 @@ def remaining_length(packet: bytes) -> Tuple[bytes, int]:
         rl += (byte & 127) * mult
         mult *= 128
         if byte & 128 == 0:
-            packet = packet[i + 1 :]
+            packet = packet[i + 1:]
             break
 
     return (packet, rl)
