@@ -38,7 +38,7 @@ def remaining_length(packet: bytes) -> Tuple[bytes, int]:
         rl += (byte & 127) * mult
         mult *= 128
         if byte & 128 == 0:
-            packet = packet[i + 1:]
+            packet = packet[i + 1 :]
             break
 
     return (packet, rl)
@@ -72,12 +72,8 @@ def to_string(packet: bytes) -> str:
         (packet, rl) = remaining_length(packet)
         pack_format = "!H" + str(len(packet) - 2) + "s"
         (slen, packet) = struct.unpack(pack_format, packet)
-        pack_format = (
-            "!" + str(slen) + "sBBH" + str(len(packet) - slen - 4) + "s"
-        )
-        (protocol, proto_ver, flags, keepalive, packet) = struct.unpack(
-            pack_format, packet
-        )
+        pack_format = "!" + str(slen) + "sBBH" + str(len(packet) - slen - 4) + "s"
+        (protocol, proto_ver, flags, keepalive, packet) = struct.unpack(pack_format, packet)
         kind = "clean-session" if flags & 2 else "durable"
         s = f"CONNECT, proto={protocol}{proto_ver}, keepalive={keepalive}, {kind}"
 
@@ -125,18 +121,9 @@ def to_string(packet: bytes) -> str:
         # CONNACK
         if len(packet) == 4:
             (cmd, rl, resv, rc) = struct.unpack("!BBBB", packet)
-            return (
-                "CONNACK, rl="
-                + str(rl)
-                + ", res="
-                + str(resv)
-                + ", rc="
-                + str(rc)
-            )
+            return "CONNACK, rl=" + str(rl) + ", res=" + str(resv) + ", rc=" + str(rc)
         elif len(packet) == 5:
-            (cmd, rl, flags, reason_code, proplen) = struct.unpack(
-                "!BBBBB", packet
-            )
+            (cmd, rl, flags, reason_code, proplen) = struct.unpack("!BBBBB", packet)
             return (
                 "CONNACK, rl="
                 + str(rl)
@@ -183,14 +170,7 @@ def to_string(packet: bytes) -> str:
         # PUBACK
         if len(packet) == 5:
             (cmd, rl, mid, reason_code) = struct.unpack("!BBHB", packet)
-            return (
-                "PUBACK, rl="
-                + str(rl)
-                + ", mid="
-                + str(mid)
-                + ", reason_code="
-                + str(reason_code)
-            )
+            return "PUBACK, rl=" + str(rl) + ", mid=" + str(mid) + ", reason_code=" + str(reason_code)
         else:
             (cmd, rl, mid) = struct.unpack("!BBH", packet)
             return "PUBACK, rl=" + str(rl) + ", mid=" + str(mid)
@@ -198,14 +178,7 @@ def to_string(packet: bytes) -> str:
         # PUBREC
         if len(packet) == 5:
             (cmd, rl, mid, reason_code) = struct.unpack("!BBHB", packet)
-            return (
-                "PUBREC, rl="
-                + str(rl)
-                + ", mid="
-                + str(mid)
-                + ", reason_code="
-                + str(reason_code)
-            )
+            return "PUBREC, rl=" + str(rl) + ", mid=" + str(mid) + ", reason_code=" + str(reason_code)
         else:
             (cmd, rl, mid) = struct.unpack("!BBH", packet)
             return "PUBREC, rl=" + str(rl) + ", mid=" + str(mid)
@@ -213,9 +186,7 @@ def to_string(packet: bytes) -> str:
         # PUBREL
         dup = (packet0 & 0x08) >> 3
         (cmd, rl, mid) = struct.unpack("!BBH", packet)
-        return (
-            "PUBREL, rl=" + str(rl) + ", mid=" + str(mid) + ", dup=" + str(dup)
-        )
+        return "PUBREL, rl=" + str(rl) + ", mid=" + str(mid) + ", dup=" + str(dup)
     elif cmd == 0x70:
         # PUBCOMP
         (cmd, rl, mid) = struct.unpack("!BBH", packet)
@@ -230,19 +201,9 @@ def to_string(packet: bytes) -> str:
         while len(packet) > 0:
             pack_format = "!H" + str(len(packet) - 2) + "s"
             (tlen, packet) = struct.unpack(pack_format, packet)
-            pack_format = (
-                "!" + str(tlen) + "sB" + str(len(packet) - tlen - 1) + "s"
-            )
+            pack_format = "!" + str(tlen) + "sB" + str(len(packet) - tlen - 1) + "s"
             (topic, qos, packet) = struct.unpack(pack_format, packet)
-            s = (
-                s
-                + ", topic"
-                + str(topic_index)
-                + "="
-                + str(topic)
-                + ","
-                + str(qos)
-            )
+            s = s + ", topic" + str(topic_index) + "=" + str(topic) + "," + str(qos)
         return s
     elif cmd == 0x90:
         # SUBACK
@@ -252,14 +213,7 @@ def to_string(packet: bytes) -> str:
         pack_format = "!" + "B" * len(packet)
         granted_qos = struct.unpack(pack_format, packet)
 
-        s = (
-            "SUBACK, rl="
-            + str(rl)
-            + ", mid="
-            + str(mid)
-            + ", granted_qos="
-            + str(granted_qos[0])
-        )
+        s = "SUBACK, rl=" + str(rl) + ", mid=" + str(mid) + ", granted_qos=" + str(granted_qos[0])
         for i in range(1, len(granted_qos) - 1):
             s = s + ", " + str(granted_qos[i])
         return s
@@ -293,12 +247,7 @@ def to_string(packet: bytes) -> str:
         # DISCONNECT
         if len(packet) == 3:
             (cmd, rl, reason_code) = struct.unpack("!BBB", packet)
-            return (
-                "DISCONNECT, rl="
-                + str(rl)
-                + ", reason_code="
-                + str(reason_code)
-            )
+            return "DISCONNECT, rl=" + str(rl) + ", reason_code=" + str(reason_code)
         else:
             (cmd, rl) = struct.unpack("!BB", packet)
             return "DISCONNECT, rl=" + str(rl)

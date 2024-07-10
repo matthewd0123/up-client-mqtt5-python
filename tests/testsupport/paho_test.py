@@ -154,23 +154,17 @@ def gen_connect(
 
     if proto_ver == 5:
         if properties == b"":
-            properties += mqtt5_props.gen_uint16_prop(
-                mqtt5_props.PROP_RECEIVE_MAXIMUM, 20
-            )
+            properties += mqtt5_props.gen_uint16_prop(mqtt5_props.PROP_RECEIVE_MAXIMUM, 20)
 
         if session_expiry != -1:
-            properties += mqtt5_props.gen_uint32_prop(
-                mqtt5_props.PROP_SESSION_EXPIRY_INTERVAL, session_expiry
-            )
+            properties += mqtt5_props.gen_uint32_prop(mqtt5_props.PROP_SESSION_EXPIRY_INTERVAL, session_expiry)
 
         properties = mqtt5_props.prop_finalise(properties)
         remaining_length += len(properties)
 
     if will_topic is not None:
         will_topic = will_topic.encode("utf-8")
-        remaining_length = (
-            remaining_length + 2 + len(will_topic) + 2 + len(will_payload)
-        )
+        remaining_length = remaining_length + 2 + len(will_topic) + 2 + len(will_payload)
         connect_flags = connect_flags | 0x04 | ((will_qos & 0x03) << 3)
         if will_retain:
             connect_flags = connect_flags | 32
@@ -212,17 +206,13 @@ def gen_connect(
         packet += properties
 
     if client_id is not None:
-        packet = packet + struct.pack(
-            "!H" + str(len(client_id)) + "s", len(client_id), bytes(client_id)
-        )
+        packet = packet + struct.pack("!H" + str(len(client_id)) + "s", len(client_id), bytes(client_id))
     else:
         packet = packet + struct.pack("!H", 0)
 
     if will_topic is not None:
         packet += will_properties
-        packet = packet + struct.pack(
-            "!H" + str(len(will_topic)) + "s", len(will_topic), will_topic
-        )
+        packet = packet + struct.pack("!H" + str(len(will_topic)) + "s", len(will_topic), will_topic)
         if len(will_payload) > 0:
             packet = packet + struct.pack(
                 "!H" + str(len(will_payload)) + "s",
@@ -233,39 +223,26 @@ def gen_connect(
             packet = packet + struct.pack("!H", 0)
 
     if username is not None:
-        packet = packet + struct.pack(
-            "!H" + str(len(username)) + "s", len(username), username
-        )
+        packet = packet + struct.pack("!H" + str(len(username)) + "s", len(username), username)
         if password is not None:
-            packet = packet + struct.pack(
-                "!H" + str(len(password)) + "s", len(password), password
-            )
+            packet = packet + struct.pack("!H" + str(len(password)) + "s", len(password), password)
     return packet
 
 
-def gen_connack(
-    flags=0, rc=0, proto_ver=4, properties=b"", property_helper=True
-):
+def gen_connack(flags=0, rc=0, proto_ver=4, properties=b"", property_helper=True):
     if proto_ver == 5:
         if property_helper:
             if properties is not None:
                 properties = (
-                    mqtt5_props.gen_uint16_prop(
-                        mqtt5_props.PROP_TOPIC_ALIAS_MAXIMUM, 10
-                    )
+                    mqtt5_props.gen_uint16_prop(mqtt5_props.PROP_TOPIC_ALIAS_MAXIMUM, 10)
                     + properties
-                    + mqtt5_props.gen_uint16_prop(
-                        mqtt5_props.PROP_RECEIVE_MAXIMUM, 20
-                    )
+                    + mqtt5_props.gen_uint16_prop(mqtt5_props.PROP_RECEIVE_MAXIMUM, 20)
                 )
             else:
                 properties = b""
         properties = mqtt5_props.prop_finalise(properties)
 
-        packet = (
-            struct.pack("!BBBB", 32, 2 + len(properties), flags, rc)
-            + properties
-        )
+        packet = struct.pack("!BBBB", 32, 2 + len(properties), flags, rc) + properties
     else:
         packet = struct.pack("!BBBB", 32, 2, flags, rc)
 
@@ -355,9 +332,7 @@ def gen_publish(
             )
 
 
-def _gen_command_with_mid(
-    cmd, mid, proto_ver=4, reason_code=-1, properties=None
-):
+def _gen_command_with_mid(cmd, mid, proto_ver=4, reason_code=-1, properties=None):
     if proto_ver == 5 and (reason_code != -1 or properties is not None):
         if reason_code == -1:
             reason_code = 0
@@ -408,25 +383,12 @@ def gen_subscribe(mid, topic, qos, cmd=130, proto_ver=4, properties=b""):
         if properties == b"":
             packet += pack_remaining_length(2 + 1 + 2 + len(topic) + 1)
             pack_format = "!HBH" + str(len(topic)) + "sB"
-            return packet + struct.pack(
-                pack_format, mid, 0, len(topic), topic, qos
-            )
+            return packet + struct.pack(pack_format, mid, 0, len(topic), topic, qos)
         else:
             properties = mqtt5_props.prop_finalise(properties)
-            packet += pack_remaining_length(
-                2 + 1 + 2 + len(topic) + len(properties)
-            )
-            pack_format = (
-                "!H"
-                + str(len(properties))
-                + "s"
-                + "H"
-                + str(len(topic))
-                + "sB"
-            )
-            return packet + struct.pack(
-                pack_format, mid, properties, len(topic), topic, qos
-            )
+            packet += pack_remaining_length(2 + 1 + 2 + len(topic) + len(properties))
+            pack_format = "!H" + str(len(properties)) + "s" + "H" + str(len(topic)) + "sB"
+            return packet + struct.pack(pack_format, mid, properties, len(topic), topic, qos)
     else:
         packet += pack_remaining_length(2 + 2 + len(topic) + 1)
         pack_format = "!HH" + str(len(topic)) + "sB"
@@ -459,9 +421,7 @@ def gen_unsubscribe(mid, topic, cmd=162, proto_ver=4, properties=b""):
             packet = struct.pack("!B", cmd)
             l = 2 + 2 + len(topic) + 1 + len(properties)  # noqa: E741
             packet += pack_remaining_length(l)
-            pack_format = (
-                "!HB" + str(len(properties)) + "sH" + str(len(topic)) + "s"
-            )
+            pack_format = "!HB" + str(len(properties)) + "sH" + str(len(topic)) + "s"
             packet += struct.pack(
                 pack_format,
                 mid,
@@ -473,9 +433,7 @@ def gen_unsubscribe(mid, topic, cmd=162, proto_ver=4, properties=b""):
             return packet
     else:
         pack_format = "!BBHH" + str(len(topic)) + "s"
-        return struct.pack(
-            pack_format, cmd, 2 + 2 + len(topic), mid, len(topic), topic
-        )
+        return struct.pack(pack_format, cmd, 2 + 2 + len(topic), mid, len(topic), topic)
 
 
 def gen_unsubscribe_multiple(mid, topics, proto_ver=4):
@@ -529,10 +487,7 @@ def _gen_short(cmd, reason_code=-1, proto_ver=5, properties=None):
             return struct.pack("!BBBB", cmd, 2, reason_code, 0)
         else:
             properties = mqtt5_props.prop_finalise(properties)
-            return (
-                struct.pack("!BBB", cmd, 1 + len(properties), reason_code)
-                + properties
-            )
+            return struct.pack("!BBB", cmd, 1 + len(properties), reason_code) + properties
     else:
         return struct.pack("!BB", cmd, 0)
 

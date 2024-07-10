@@ -1,5 +1,5 @@
 """
-SPDX-FileCopyrightText: Copyright (c) 2023 Contributors to the 
+SPDX-FileCopyrightText: Copyright (c) 2023 Contributors to the
 Eclipse Foundation
 
 See the NOTICE file(s) distributed with this work for additional
@@ -20,31 +20,29 @@ SPDX-FileType: SOURCE
 SPDX-License-Identifier: Apache-2.0
 """
 
-from typing import Dict, List
-from concurrent.futures import Future
 import logging
 import ssl
 import threading
-import socket
+from concurrent.futures import Future
+from typing import Dict, List
+
 import paho.mqtt.client as mqtt
-
-from uprotocol.transport.utransport import UTransport
-from uprotocol.proto.ustatus_pb2 import UStatus, UCode
-from uprotocol.proto.umessage_pb2 import UMessage
-from uprotocol.proto.uattributes_pb2 import UMessageType
-from uprotocol.proto.uri_pb2 import UUri, UEntity, UResource
-from uprotocol.proto.uuid_pb2 import UUID
-from uprotocol.proto.upayload_pb2 import UPayload
-from uprotocol.proto.uattributes_pb2 import UAttributes, UPriority
 from uprotocol.transport.ulistener import UListener
-from uprotocol.uri.serializer.shorturiserializer import ShortUriSerializer
-from uprotocol.cloudevent.serialize.base64protobufserializer import (
-    Base64ProtobufSerializer,
+from uprotocol.transport.utransport import UTransport
+from uprotocol.v1.uattributes_pb2 import UAttributes, UMessageType
+from uprotocol.v1.ucode_pb2 import UCode
+from uprotocol.v1.umessage_pb2 import UMessage
+from uprotocol.v1.uri_pb2 import UUri
+from uprotocol.v1.ustatus_pb2 import UStatus
+from uprotocol.v1.uuid_pb2 import UUID
+
+from up_client_mqtt5_python.utils.utils import (
+    build_attributes_from_mqtt_properties,
+    build_message_from_mqtt_message_and_attributes,
+    build_mqtt_properties_from_attributes,
 )
 
-logging.basicConfig(
-    format="%(levelname)s| %(filename)s:%(lineno)s %(message)s"
-)
+logging.basicConfig(format="%(levelname)s| %(filename)s:%(lineno)s %(message)s")
 logger = logging.getLogger("File:Line# Debugger")
 logger.setLevel(logging.DEBUG)
 
@@ -54,9 +52,7 @@ class MQTT5UTransport(UTransport):
     MQTTv5 Transport for UProtocol
     """
 
-    def __init__(
-        self, client_id: str, host_name: str, port: int, cloud_device: bool
-    ) -> None:
+    def __init__(self, source: UUri, client_id: str, host_name: str, port: int, cloud_device: bool) -> None:
         """
         Creates a UEntity with an MQTTv5 Connection, as well as tracking a
         list of registered listeners.
@@ -66,6 +62,7 @@ class MQTT5UTransport(UTransport):
         @param cloud_device: Whether or not your device lives in the cloud.
         """
 
+        self.source = source
         self.host_name = host_name
         self.port = port
         self.cloud_device = cloud_device
@@ -108,9 +105,7 @@ class MQTT5UTransport(UTransport):
         self.context.verify_mode = verify_mode
         self.context.check_hostname = check_hostname
         if certificate_filename is not None:
-            self.context.load_cert_chain(
-                certificate_filename, key_filename, key_pass_phrase
-            )
+            self.context.load_cert_chain(certificate_filename, key_filename, key_pass_phrase)
         self._mqtt_client.tls_set_context(self.context)
 
     def connect(self):
@@ -130,7 +125,7 @@ class MQTT5UTransport(UTransport):
         self._mqtt_client.loop_start()
         logger.info("%s started MQTT Loop", self.__class__.__name__)
 
-    def _listen(self, msg):
+    def _listen(self, client, userdata, msg):
         """
         Listens for and processes messages from MQTT Broker.
         @param client:
@@ -139,51 +134,8 @@ class MQTT5UTransport(UTransport):
         @return: None
         """
 
-        payload_data: UPayload = UPayload()
-        payload_data.ParseFromString(msg.payload)
-        umsg: UMessage = UMessage()
-        umsg.payload.CopyFrom(payload_data)
-
-        publish_properties = msg.properties
-
-        attributes: UAttributes = UAttributes()
-        for user_property in publish_properties.UserProperty:
-            if user_property[0] == "1":
-                id_proto: UUID = UUID()
-                id_proto.ParseFromString(
-                    Base64ProtobufSerializer().serialize(user_property[1])
-                )
-                attributes.id.CopyFrom(id_proto)
-            elif user_property[0] == "2":
-                attributes.type = UMessageType.Value(user_property[1])
-            elif user_property[0] == "3":
-                attributes.source.CopyFrom(
-                    ShortUriSerializer().deserialize(user_property[1])
-                )
-            elif user_property[0] == "4":
-                attributes.sink.CopyFrom(
-                    ShortUriSerializer().deserialize(user_property[1])
-                )
-            elif user_property[0] == "5":
-                attributes.priority = UPriority.Value(user_property[1])
-            elif user_property[0] == "6":
-                attributes.ttl = int(user_property[1])
-            elif user_property[0] == "7":
-                attributes.permission_level = int(user_property[1])
-            elif user_property[0] == "8":
-                attributes.commstatus = UCode.Value(user_property[1])
-            elif user_property[0] == "9":
-                reqid_proto: UUID = UUID()
-                reqid_proto.ParseFromString(
-                    Base64ProtobufSerializer().serialize(user_property[1])
-                )
-                attributes.reqid.CopyFrom(reqid_proto)
-            elif user_property[0] == "10":
-                attributes.token = user_property[1]
-            elif user_property[0] == "11":
-                attributes.traceparent = user_property[1]
-
-        umsg.attributes.CopyFrom(attributes)
+        attributes: UAttributes = build_attributes_from_mqtt_properties(msg.properties)
+        umsg: UMessage = build_message_from_mqtt_message_and_attributes(msg, attributes)
 
         message_type_handlers = {
             UMessageType.UMESSAGE_TYPE_PUBLISH: self._handle_publish_message,
@@ -209,21 +161,14 @@ class MQTT5UTransport(UTransport):
 
     def _handle_publish_message(self, topic: str, umsg: UMessage):
         if topic in self.topic_to_listener:
-            logger.info(
-                "%s Handle Topic",
-                self.__class__.__name__
-            )
+            logger.info("%s Handle Topic", self.__class__.__name__)
 
             for listener in self.topic_to_listener[topic]:
                 listener.on_receive(umsg)
         else:
-            logger.info(
-                "%s %s not found in Listener Map",
-                self.__class__.__name__,
-                topic
-            )
+            logger.info("%s %s not found in Listener Map", self.__class__.__name__, topic)
 
-    def mqtt_topic_builder(self, topic: UUri) -> str:
+    def mqtt_topic_builder(self, source: UUri, sink: UUri = None) -> str:
         """
         Builds MQTT topic based on whether the topic authority is
         local or remote.
@@ -232,31 +177,39 @@ class MQTT5UTransport(UTransport):
         registering a listener
         @return: returns MQTT Topic
         """
-        if topic.entity in [None, UEntity()]:
-            raise ValueError(
-                "Entity is required in source when building topic"
-            )
-        entity_id = str(topic.entity.id)
-        version_major = str(topic.entity.version_major)
-        if topic.resource in [None, UResource()]:
-            raise ValueError(
-                "Resource is required in source when building topic"
-            )
-        resource_id = str(topic.resource.id)
 
-        if topic.authority.HasField("ip"):
-            try:
-                authority_number = socket.inet_ntop(
-                    socket.AF_INET, topic.authority.ip
-                )
-            except ValueError as e:
-                raise ValueError(e) from e
-        elif topic.authority.HasField("id"):
-            authority_number = topic.authority.id.decode("utf-8")
-        else:
-            authority_number = self.host_name
-
-        return f"{authority_number}/{entity_id}/{version_major}/{resource_id}"
+        device = "c" if self.cloud_device else "d"
+        src_auth_name = source.authority_name if source != UUri() else "+"
+        src_ue_id = source.ue_id if source != UUri() and source.ue_id != 0xFFFF else "+"
+        src_ue_version_major = source.ue_version_major if source != UUri() and source.ue_version_major != 0xFF else "+"
+        src_resource_id = source.resource_id if source != UUri() and source.resource_id != 0xFFFF else "+"
+        topic = (
+            device
+            + "/"
+            + src_auth_name
+            + "/"
+            + str(src_ue_id)
+            + "/"
+            + str(src_ue_version_major)
+            + "/"
+            + str(src_resource_id)
+        )
+        if sink is not None and sink != UUri():
+            sink_auth_name = sink.authority_name
+            sink_ue_id = sink.ue_id if sink.ue_id != 0xFFFF else "+"
+            sink_ue_version_major = sink.ue_version_major if sink.ue_version_major != 0xFF else "+"
+            sink_resource_id = sink.resource_id if sink.resource_id != 0xFFFF else "+"
+            topic += (
+                "/"
+                + sink_auth_name
+                + "/"
+                + str(sink_ue_id)
+                + "/"
+                + str(sink_ue_version_major)
+                + "/"
+                + str(sink_resource_id)
+            )
+        return topic
 
     def send(self, message: UMessage) -> UStatus:
         """
@@ -268,80 +221,12 @@ class MQTT5UTransport(UTransport):
         with the appropriate failure.
         """
 
-        payload_proto: UPayload = message.payload
-        uattributes_proto: UAttributes = message.attributes
+        payload: bytes = message.payload
 
-        publish_properties = mqtt.Properties(mqtt.PacketTypes.PUBLISH)
-        publish_properties.UserProperty = []
-        try:
-            if uattributes_proto.HasField("id"):
-                publish_properties.UserProperty.append(
-                    (
-                        "1",
-                        Base64ProtobufSerializer().deserialize(
-                            uattributes_proto.id.SerializeToString()
-                        ),
-                    )
-                )
-            publish_properties.UserProperty.append(
-                ("2", UMessageType.Name(uattributes_proto.type))
-            )
-            if uattributes_proto.HasField("source"):
-                publish_properties.UserProperty.append(
-                    (
-                        "3",
-                        ShortUriSerializer().serialize(
-                            uattributes_proto.source
-                        ),
-                    )
-                )
-            if uattributes_proto.HasField("sink"):
-                publish_properties.UserProperty.append(
-                    (
-                        "4",
-                        ShortUriSerializer().serialize(uattributes_proto.sink),
-                    )
-                )
-            publish_properties.UserProperty.append(
-                ("5", UPriority.Name(uattributes_proto.priority))
-            )
-            if uattributes_proto.HasField("ttl"):
-                publish_properties.UserProperty.append(
-                    ("6", str(uattributes_proto.ttl))
-                )
-            if uattributes_proto.HasField("permission_level"):
-                publish_properties.UserProperty.append(
-                    ("7", str(uattributes_proto.permission_level))
-                )
-            if uattributes_proto.HasField("commstatus"):
-                publish_properties.UserProperty.append(
-                    ("8", UCode.Name(uattributes_proto.commstatus))
-                )
-            if uattributes_proto.type == UMessageType.UMESSAGE_TYPE_RESPONSE:
-                publish_properties.UserProperty.append(
-                    (
-                        "9",
-                        Base64ProtobufSerializer().deserialize(
-                            uattributes_proto.reqid.SerializeToString()
-                        ),
-                    )
-                )
-            if uattributes_proto.HasField("token"):
-                publish_properties.UserProperty.append(
-                    ("10", uattributes_proto.token)
-                )
-            if uattributes_proto.HasField("traceparent"):
-                publish_properties.UserProperty.append(
-                    ("11", uattributes_proto.traceparent)
-                )
-        except ValueError as e:
-            raise ValueError(e) from e
+        publish_properties = build_mqtt_properties_from_attributes(message.attributes)
 
-        payload: bytes = payload_proto.SerializeToString()
         self._mqtt_client.publish(
-            topic=self.mqtt_topic_builder(
-                topic=message.attributes.source
-            ),
+            topic=self.mqtt_topic_builder(source=message.attributes.source, sink=message.attributes.sink),
             payload=payload,
             qos=1,
             properties=publish_properties,
@@ -349,7 +234,7 @@ class MQTT5UTransport(UTransport):
 
         return UStatus(code=UCode.OK, message="OK")
 
-    def register_listener(self, topic: UUri, listener: UListener) -> UStatus:
+    def register_listener(self, source_filter: UUri, listener: UListener, sink_filter: UUri = None) -> UStatus:
         """
         Register listener to be called when UPayload is received for the
         specific topic.
@@ -362,7 +247,7 @@ class MQTT5UTransport(UTransport):
         appropriate failure.
         """
 
-        mqtt_topic = self.mqtt_topic_builder(topic=topic)
+        mqtt_topic = self.mqtt_topic_builder(source=source_filter, sink=sink_filter)
         self.topic_to_listener.setdefault(mqtt_topic, []).append(listener)
 
         self._mqtt_client.subscribe(topic=mqtt_topic, qos=1)
@@ -371,7 +256,7 @@ class MQTT5UTransport(UTransport):
 
         return UStatus(code=UCode.OK, message="OK")
 
-    def unregister_listener(self, topic: UUri, listener: UListener) -> UStatus:
+    def unregister_listener(self, source_filter: UUri, listener: UListener, sink_filter: UUri) -> UStatus:
         """
         Register listener to be called when UPayload is received for the
         specific topic.
@@ -383,7 +268,7 @@ class MQTT5UTransport(UTransport):
         correctly, otherwise it returns FAILSTATUS with the
         appropriate failure.
         """
-        mqtt_topic = self.mqtt_topic_builder(topic=topic)
+        mqtt_topic = self.mqtt_topic_builder(source=source_filter, sink=sink_filter)
 
         if mqtt_topic in self.topic_to_listener:
             if len(self.topic_to_listener[mqtt_topic]) > 1:
@@ -394,3 +279,18 @@ class MQTT5UTransport(UTransport):
         self._mqtt_client.unsubscribe(topic=mqtt_topic)
 
         return UStatus(code=UCode.OK, message="OK")
+
+    def get_source(self) -> UUri:
+        """
+        Returns the source of the MQTT Transport.
+        @return: UUri source
+        """
+        return self.source
+
+    def close(self):
+        """
+        Closes the MQTT Connection.
+        @return: None
+        """
+        self._mqtt_client.disconnect()
+        self._mqtt_client.loop_stop()

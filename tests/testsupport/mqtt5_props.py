@@ -68,9 +68,7 @@ def gen_string_prop(identifier, s):
 def gen_string_pair_prop(identifier, s1, s2):
     s1 = s1.encode("utf-8")
     s2 = s2.encode("utf-8")
-    prop = struct.pack(
-        f"!BH{len(s1)}sH{len(s2)}s", identifier, len(s1), s1, len(s2), s2
-    )
+    prop = struct.pack(f"!BH{len(s1)}sH{len(s2)}s", identifier, len(s1), s1, len(s2), s2)
     return prop
 
 

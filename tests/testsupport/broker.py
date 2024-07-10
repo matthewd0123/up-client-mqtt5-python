@@ -77,12 +77,10 @@ class FakeBroker:
 
 @pytest.fixture
 def fake_broker():
-    # print('Setup broker')
     broker = FakeBroker()
 
     yield broker
 
-    # print('Teardown broker')
     broker.finish()
 
 

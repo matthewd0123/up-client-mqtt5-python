@@ -13,7 +13,7 @@ packages = [{ include = "up_client_mqtt5_python" },
 
 [tool.poetry.dependencies]
 python = "^3.8"
-up-python = "0.1.2-dev0"
+up-python = "0.1.3-dev0"
 paho-mqtt = "2.0.0"
 
 [build-system]
