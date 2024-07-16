@@ -58,11 +58,15 @@ def build_source():
     return UUri(authority_name="vcu.matthew.com", ue_id=1234, ue_version_major=1, resource_id=0x8000)
 
 
+def build_sink():
+    return UUri(authority_name="vcu.matthew.com", ue_id=0xFFFF, ue_version_major=0xFF, resource_id=0xFFFF)
+
+
 if __name__ == "__main__":
-    mqtt5_subscriber = MQTT5UTransport(build_source(), "client_sub", "127.0.0.1", 1883, False)
+    mqtt5_subscriber = MQTT5UTransport(build_source(), "client_sub", "127.0.0.1", 8883, False)
     mqtt5_subscriber.connect()
     source: UUri = build_source()
     listener: MQTT5UListener = MQTT5UListener()
-    mqtt5_subscriber.register_listener(source, listener)
+    mqtt5_subscriber.register_listener(source, listener, build_sink())
     while True:
         time.sleep(10)

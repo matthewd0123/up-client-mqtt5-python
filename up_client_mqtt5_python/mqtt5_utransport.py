@@ -40,6 +40,7 @@ from up_client_mqtt5_python.utils.utils import (
     build_attributes_from_mqtt_properties,
     build_message_from_mqtt_message_and_attributes,
     build_mqtt_properties_from_attributes,
+    uuri_field_resolver,
 )
 
 logging.basicConfig(format="%(levelname)s| %(filename)s:%(lineno)s %(message)s")
@@ -70,7 +71,7 @@ class MQTT5UTransport(UTransport):
 
         self._connected_signal = threading.Event()
 
-        self.topic_to_listener: Dict[bytes, List[UListener]] = {}
+        self.topic_to_listener: Dict[str, List[UListener]] = {}
         self.reqid_to_future: Dict[bytes, Future] = {}
 
         self._mqtt_client = mqtt.Client(
@@ -133,11 +134,13 @@ class MQTT5UTransport(UTransport):
         @param msg:
         @return: None
         """
+        logger.info(f"Received Message on MQTT: {msg}")
 
         attributes: UAttributes = build_attributes_from_mqtt_properties(msg.properties)
         umsg: UMessage = build_message_from_mqtt_message_and_attributes(msg, attributes)
 
         message_type_handlers = {
+            UMessageType.UMESSAGE_TYPE_UNSPECIFIED: self._handle_unspecified_message,
             UMessageType.UMESSAGE_TYPE_PUBLISH: self._handle_publish_message,
             UMessageType.UMESSAGE_TYPE_REQUEST: self._handle_publish_message,
             UMessageType.UMESSAGE_TYPE_RESPONSE: self._handle_response_message,
@@ -147,9 +150,14 @@ class MQTT5UTransport(UTransport):
         if handler:
             handler(msg.topic, umsg)
         else:
-            raise ValueError("Unsupported message type: " + attributes.type)
+            raise ValueError("Unsupported message type: " + UMessageType.Name(attributes.type))
 
-    def _handle_response_message(self, umsg: UMessage):
+    def _handle_unspecified_message(self, topic: str, umsg: UMessage):
+        logger.info("%s Unspecified Message Received", self.__class__.__name__)
+        logger.info(f"Message Details: {umsg}")
+        logger.info(f"Unspecified Message received on topic {topic}")
+
+    def _handle_response_message(self, topic: str, umsg: UMessage):
         request_id: UUID = umsg.attributes.reqid
         request_id_b: bytes = request_id.SerializeToString()
 
@@ -161,7 +169,7 @@ class MQTT5UTransport(UTransport):
 
     def _handle_publish_message(self, topic: str, umsg: UMessage):
         if topic in self.topic_to_listener:
-            logger.info("%s Handle Topic", self.__class__.__name__)
+            logger.info("%s Handle Publish Message on Topic", self.__class__.__name__)
 
             for listener in self.topic_to_listener[topic]:
                 listener.on_receive(umsg)
@@ -179,36 +187,18 @@ class MQTT5UTransport(UTransport):
         """
 
         device = "c" if self.cloud_device else "d"
-        src_auth_name = source.authority_name if source != UUri() else "+"
-        src_ue_id = source.ue_id if source != UUri() and source.ue_id != 0xFFFF else "+"
-        src_ue_version_major = source.ue_version_major if source != UUri() and source.ue_version_major != 0xFF else "+"
-        src_resource_id = source.resource_id if source != UUri() and source.resource_id != 0xFFFF else "+"
-        topic = (
-            device
-            + "/"
-            + src_auth_name
-            + "/"
-            + str(src_ue_id)
-            + "/"
-            + str(src_ue_version_major)
-            + "/"
-            + str(src_resource_id)
-        )
+        if source != UUri():
+            src_auth_name = source.authority_name if source != UUri() else "+"
+            src_ue_id = uuri_field_resolver(source.ue_id, 0xFFFF, "ffff")
+            src_ue_version_major = uuri_field_resolver(source.ue_version_major, 0xFF, "ff")
+            src_resource_id = uuri_field_resolver(source.resource_id, 0xFFFF, "ffff")
+        topic = device + "/" + src_auth_name + "/" + src_ue_id + "/" + src_ue_version_major + "/" + src_resource_id
         if sink is not None and sink != UUri():
             sink_auth_name = sink.authority_name
-            sink_ue_id = sink.ue_id if sink.ue_id != 0xFFFF else "+"
-            sink_ue_version_major = sink.ue_version_major if sink.ue_version_major != 0xFF else "+"
-            sink_resource_id = sink.resource_id if sink.resource_id != 0xFFFF else "+"
-            topic += (
-                "/"
-                + sink_auth_name
-                + "/"
-                + str(sink_ue_id)
-                + "/"
-                + str(sink_ue_version_major)
-                + "/"
-                + str(sink_resource_id)
-            )
+            sink_ue_id = uuri_field_resolver(sink.ue_id, 0xFFFF, "ffff")
+            sink_ue_version_major = uuri_field_resolver(sink.ue_version_major, 0xFF, "ff")
+            sink_resource_id = uuri_field_resolver(sink.resource_id, 0xFFFF, "ffff")
+            topic += "/" + sink_auth_name + "/" + sink_ue_id + "/" + sink_ue_version_major + "/" + sink_resource_id
         return topic
 
     def send(self, message: UMessage) -> UStatus:
@@ -248,6 +238,8 @@ class MQTT5UTransport(UTransport):
         """
 
         mqtt_topic = self.mqtt_topic_builder(source=source_filter, sink=sink_filter)
+        logger.info("%s Registering Listener for Topic: %s", self.__class__.__name__, mqtt_topic)
+
         self.topic_to_listener.setdefault(mqtt_topic, []).append(listener)
 
         self._mqtt_client.subscribe(topic=mqtt_topic, qos=1)

@@ -41,7 +41,7 @@ def build_source():
 
 
 def build_sink():
-    return UUri(authority_name="vcu.matthew.com", ue_id=1234, ue_version_major=1, resource_id=0)
+    return UUri(authority_name="vcu.matthew.com", ue_id=0xFFFF, ue_version_major=0xFF, resource_id=0xFFFF)
 
 
 def build_timestamp_upayload():
@@ -53,7 +53,7 @@ def build_umessage(payload, source=build_source()):
 
 
 if __name__ == "__main__":
-    mqtt5_publisher = MQTT5UTransport(build_sink(), "client_pub", "127.0.0.1", 1883, False)
+    mqtt5_publisher = MQTT5UTransport(build_sink(), "client_pub", "127.0.0.1", 8883, False)
     mqtt5_publisher.connect()
     umsg: UMessage = build_umessage(build_timestamp_upayload())
     while True:

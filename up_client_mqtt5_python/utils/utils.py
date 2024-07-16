@@ -25,8 +25,7 @@ from uprotocol.communication.upayload import UPayload
 from uprotocol.transport.builder.umessagebuilder import UMessageBuilder
 from uprotocol.uri.serializer.uriserializer import UriSerializer
 from uprotocol.uuid.serializer.uuidserializer import UuidSerializer
-from uprotocol.v1.uattributes_pb2 import UAttributes, UMessageType, UPriority
-from uprotocol.v1.ucode_pb2 import UCode
+from uprotocol.v1.uattributes_pb2 import UAttributes, UMessageType
 from uprotocol.v1.umessage_pb2 import UMessage
 
 
@@ -63,19 +62,19 @@ def build_attributes_from_mqtt_properties(publish_properties) -> UAttributes:
         if user_property[0] == "1":
             attributes.id.CopyFrom(UuidSerializer.deserialize(user_property[1]))
         elif user_property[0] == "2":
-            attributes.type = UMessageType.Value(user_property[1])
+            attributes.type = int(user_property[1])
         elif user_property[0] == "3":
             attributes.source.CopyFrom(UriSerializer.deserialize(user_property[1]))
         elif user_property[0] == "4":
             attributes.sink.CopyFrom(UriSerializer.deserialize(user_property[1]))
         elif user_property[0] == "5":
-            attributes.priority = UPriority.Value(user_property[1])
+            attributes.priority = int(user_property[1])
         elif user_property[0] == "6":
             attributes.ttl = int(user_property[1])
         elif user_property[0] == "7":
             attributes.permission_level = int(user_property[1])
         elif user_property[0] == "8":
-            attributes.commstatus = UCode.Value(user_property[1])
+            attributes.commstatus = int(user_property[1])
         elif user_property[0] == "9":
             attributes.reqid.CopyFrom(UuidSerializer.deserialize(user_property[1]))
         elif user_property[0] == "10":
@@ -83,7 +82,7 @@ def build_attributes_from_mqtt_properties(publish_properties) -> UAttributes:
         elif user_property[0] == "11":
             attributes.traceparent = user_property[1]
         elif user_property[0] == "12":
-            attributes.payload_format = user_property[1]
+            attributes.payload_format = int(user_property[1])
     return attributes
 
 
@@ -98,7 +97,7 @@ def build_mqtt_properties_from_attributes(attributes: UAttributes):
     try:
         if attributes.HasField("id"):
             publish_properties.UserProperty.append(("1", UuidSerializer.serialize(attributes.id)))
-        publish_properties.UserProperty.append(("2", UMessageType.Name(attributes.type)))
+        publish_properties.UserProperty.append(("2", str(attributes.type)))
         if attributes.HasField("source"):
             publish_properties.UserProperty.append(("3", UriSerializer.serialize(attributes.source)))
         if attributes.HasField("sink"):
@@ -108,13 +107,13 @@ def build_mqtt_properties_from_attributes(attributes: UAttributes):
                     UriSerializer.serialize(attributes.sink),
                 )
             )
-        publish_properties.UserProperty.append(("5", UPriority.Name(attributes.priority)))
+        publish_properties.UserProperty.append(("5", str(attributes.priority)))
         if attributes.HasField("ttl"):
             publish_properties.UserProperty.append(("6", str(attributes.ttl)))
         if attributes.HasField("permission_level"):
             publish_properties.UserProperty.append(("7", str(attributes.permission_level)))
         if attributes.HasField("commstatus"):
-            publish_properties.UserProperty.append(("8", UCode.Name(attributes.commstatus)))
+            publish_properties.UserProperty.append(("8", str(attributes.commstatus)))
         if attributes.type == UMessageType.UMESSAGE_TYPE_RESPONSE:
             publish_properties.UserProperty.append(
                 (
@@ -130,3 +129,18 @@ def build_mqtt_properties_from_attributes(attributes: UAttributes):
         raise ValueError(e) from e
 
     return publish_properties
+
+
+def length_resolver(field):
+    return "0" + field if len(field) % 2 == 1 else field
+
+
+def uuri_field_resolver(field, wildcard_value, wild_return="+"):
+    """
+    Returns self if value isn't wild or empty, else returns wildcard_value
+    :param field: field to resolve
+    :wildcard_value: wildcard value of the field
+    :return: resolved field
+    """
+    hex_val = length_resolver(f'{field:x}')
+    return hex_val if field != wildcard_value else wild_return
