@@ -141,8 +141,9 @@ class MQTT5UTransport(UTransport):
 
         message_type_handlers = {
             UMessageType.UMESSAGE_TYPE_UNSPECIFIED: self._handle_unspecified_message,
-            UMessageType.UMESSAGE_TYPE_PUBLISH: self._handle_publish_message,
-            UMessageType.UMESSAGE_TYPE_REQUEST: self._handle_publish_message,
+            UMessageType.UMESSAGE_TYPE_PUBLISH: self._handle_gen_message,
+            UMessageType.UMESSAGE_TYPE_REQUEST: self._handle_gen_message,
+            UMessageType.UMESSAGE_TYPE_NOTIFICATION: self._handle_gen_message,
             UMessageType.UMESSAGE_TYPE_RESPONSE: self._handle_response_message,
         }
 
@@ -167,14 +168,24 @@ class MQTT5UTransport(UTransport):
 
             del self.reqid_to_future[request_id_b]
 
-    def _handle_publish_message(self, topic: str, umsg: UMessage):
-        if topic in self.topic_to_listener:
-            logger.info("%s Handle Publish Message on Topic", self.__class__.__name__)
+    def _handle_gen_message(self, topic: str, umsg: UMessage):
 
-            for listener in self.topic_to_listener[topic]:
-                listener.on_receive(umsg)
-        else:
-            logger.info("%s %s not found in Listener Map", self.__class__.__name__, topic)
+        topic = topic.replace("FFFF", "+").replace("FF", "+")
+
+        pieces_of_topic = topic.split("/")
+        for x in self.topic_to_listener.keys():
+            pieces_of_x = x.split("/")
+            if len(pieces_of_topic) == len(pieces_of_x):
+                matches = True
+                for i in range(len(pieces_of_topic)):
+                    if pieces_of_x[i] == "+":
+                        continue
+                    if pieces_of_x[i] != pieces_of_topic[i]:
+                        matches = False
+                if matches:
+                    logger.info("%s Handle Message on Topic", self.__class__.__name__)
+                    for listener in self.topic_to_listener[x]:
+                        listener.on_receive(umsg)
 
     def mqtt_topic_builder(self, source: UUri, sink: UUri = None) -> str:
         """
@@ -189,15 +200,15 @@ class MQTT5UTransport(UTransport):
         device = "c" if self.cloud_device else "d"
         if source != UUri():
             src_auth_name = source.authority_name if source != UUri() else "+"
-            src_ue_id = uuri_field_resolver(source.ue_id, 0xFFFF, "ffff")
-            src_ue_version_major = uuri_field_resolver(source.ue_version_major, 0xFF, "ff")
-            src_resource_id = uuri_field_resolver(source.resource_id, 0xFFFF, "ffff")
+            src_ue_id = uuri_field_resolver(source.ue_id, 0xFFFF, "+")
+            src_ue_version_major = uuri_field_resolver(source.ue_version_major, 0xFF, "+")
+            src_resource_id = uuri_field_resolver(source.resource_id, 0xFFFF, "+")
         topic = device + "/" + src_auth_name + "/" + src_ue_id + "/" + src_ue_version_major + "/" + src_resource_id
         if sink is not None and sink != UUri():
             sink_auth_name = sink.authority_name
-            sink_ue_id = uuri_field_resolver(sink.ue_id, 0xFFFF, "ffff")
-            sink_ue_version_major = uuri_field_resolver(sink.ue_version_major, 0xFF, "ff")
-            sink_resource_id = uuri_field_resolver(sink.resource_id, 0xFFFF, "ffff")
+            sink_ue_id = uuri_field_resolver(sink.ue_id, 0xFFFF, "+")
+            sink_ue_version_major = uuri_field_resolver(sink.ue_version_major, 0xFF, "+")
+            sink_resource_id = uuri_field_resolver(sink.resource_id, 0xFFFF, "+")
             topic += "/" + sink_auth_name + "/" + sink_ue_id + "/" + sink_ue_version_major + "/" + sink_resource_id
         return topic
 
